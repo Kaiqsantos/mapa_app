@@ -4,6 +4,7 @@ from geopy.distance import geodesic
 from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap, BoundaryNorm
+import math
 
 modo_escuro = st.session_state["escuro"]
 
@@ -22,8 +23,8 @@ if not modo is None:
     tab2.markdown(f"""
     <div style="overflow: auto; max-height: 400px; max-width: 800px">
     {mostrar_df.style.set_properties(**{'text-align': 'center'})
-    .map(lambda elem: 'background-color: #BBB; color: #000' if elem == 0 else 'background-color: #FFF; color: #000')
-    .to_html()} </div>""", unsafe_allow_html=True)
+                  .map(lambda elem: 'background-color: #BBB; color: #000' if elem == 0 else 'background-color: #FFF; color: #000')
+                  .to_html()} </div>""", unsafe_allow_html=True)
 
 
     coords_origem = st.session_state['centroide'].loc[estado]
@@ -49,42 +50,24 @@ if not modo is None:
                       coords_origem.x - st.session_state['centroide'].loc[it].x,
                       coords_origem.y - st.session_state['centroide'].loc[it].y,
                       angles='xy', scale_units='xy', scale=1, color=sm.to_rgba(df_1_e.copy().loc[estado,it]))
-    if modo == "Origem":
-        ax.set_title('Mapa do fluxo entre a UF de origem -> UF de destino', color=st.session_state["cores"]['tex'][modo_escuro])
-        rco = np.radians(coords_origem.coords)[0]
-        origem_xyz = np.array([np.cos(rco[1]) * np.cos(rco[0]),
-                               np.cos(rco[1]) * np.sin(rco[0]),
-                               np.sin(rco[1])])
-        destinos_xyz = np.array([np.array([np.cos(np.radians(d.y)) * np.cos(np.radians(d.x)),
-                                     np.cos(np.radians(d.y)) * np.sin(np.radians(d.x)),
-                                     np.sin(np.radians(d.y))]) for d in st.session_state['centroide'].copy().drop(estado)])
-        res = origem_xyz + np.average(destinos_xyz - origem_xyz, axis=0, weights=df_1_e.copy().loc[:,estado].drop(estado).values)
-        res /= np.linalg.norm(res)
-        ponderada = {"lat": np.degrees(np.arctan2(res[2], np.sqrt(res[0] ** 2 + res[1] ** 2))),
-                     "lon": np.degrees(np.arctan2(res[1], res[0]))}
-
-        ax.quiver(coords_origem.x, coords_origem.y, ponderada["lon"] - coords_origem.x,
-                      ponderada["lat"] - coords_origem.y, angles='xy', scale_units='xy',
-                      scale=1, color="darkviolet")
-    else:
-        ax.set_title('Mapa do fluxo entre a UF de destino <- UF de origem', color=st.session_state["cores"]['tex'][modo_escuro])
-        rco = np.radians(coords_origem.coords)[0]
-        origem_xyz = np.array([np.cos(rco[1]) * np.cos(rco[0]),
-                               np.cos(rco[1]) * np.sin(rco[0]),
-                               np.sin(rco[1])])
-        destinos_xyz = np.array([np.array([np.cos(np.radians(d.y)) * np.cos(np.radians(d.x)),
-                                           np.cos(np.radians(d.y)) * np.sin(np.radians(d.x)),
-                                           np.sin(np.radians(d.y))]) for d in
-                                 st.session_state['centroide'].copy().drop(estado)])
-        res = origem_xyz + np.average(destinos_xyz - origem_xyz, axis=0,
-                                      weights=df_1_e.copy().loc[estado, :].drop(estado).values)
-        res /= np.linalg.norm(res)
-        ponderada = {"lat": np.degrees(np.arctan2(res[2], np.sqrt(res[0] ** 2 + res[1] ** 2))),
-                     "lon": np.degrees(np.arctan2(res[1], res[0]))}
-
-        ax.quiver(ponderada["lon"], ponderada["lat"], coords_origem.x - ponderada["lon"],
-                  coords_origem.y - ponderada["lat"], angles='xy', scale_units='xy',
-                  scale=1, color="darkviolet")
+    rco = np.radians(coords_origem.coords)[0]
+    origem_xyz = np.array([np.cos(rco[1]) * np.cos(rco[0]), np.cos(rco[1]) * np.sin(rco[0]), np.sin(rco[1])])
+    destinos_xyz = np.array([np.array([np.cos(np.radians(d.y)) * np.cos(np.radians(d.x)),
+                                       np.cos(np.radians(d.y)) * np.sin(np.radians(d.x)),
+                                       np.sin(np.radians(d.y))]) for d in
+                             st.session_state['centroide'].copy().drop(estado).sort_index()])
+    ax.set_title(rf'Mapa do fluxo entre a '
+                 rf'{"UF de origem -> UF de destino" if modo == "Origem" else "UF de destino <- UF de origem"}',
+                 color=st.session_state["cores"]['tex'][modo_escuro])
+    pesos = df_1_e.copy().loc[:,estado] if modo == "Origem" else df_1_e.copy().loc[estado, :]
+    pesos = pesos.copy().drop(estado).sort_index().values
+    res = origem_xyz + np.average(destinos_xyz - origem_xyz, axis=0, weights=pesos)
+    res /= np.linalg.norm(res)
+    ponderada = (np.degrees(np.arctan2(res[1], res[0])), np.degrees(np.arctan2(res[2], np.sqrt(res[0] ** 2 + res[1] ** 2))))
+    origem = (coords_origem.x, coords_origem.y) if modo == "Origem" else ponderada
+    ax.quiver(*origem, (ponderada[0] - origem[0]) * (1 if modo == "Origem" else -1),
+              (ponderada[1] - origem[1]) * (1 if modo == "Origem" else -1), angles='xy', scale_units='xy',
+              scale=1, color="darkviolet")
 
     cbar = fig.colorbar(sm, ax=ax, orientation='horizontal', fraction=0.05)
     cbar.set_label('Número de indivíduos', color=st.session_state["cores"]['tex'][modo_escuro])

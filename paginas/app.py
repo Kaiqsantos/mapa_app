@@ -3,10 +3,10 @@ import pandas as pd
 import geopandas as gpd
 from PIL import Image
 import numpy as np
-from colorsys import rgb_to_hsv, hsv_to_rgb
 
 inicial = st.Page("inicial.py", title="Página Inicial", icon=":material/add_circle:")
 mapa = st.Page("mapa.py", title="Gerador de Mapas", icon=":material/add_circle:")
+gerador = st.Page("gerador.py", title="Gerador de Mapas", icon=":material/add_circle:")
 visualizador = st.Page("visualizador.py", title="Visualizador", icon=":material/add_circle:")
 sobre = st.Page("sobre.py", title="Sobre", icon=":material/add_circle:")
 
